@@ -1,0 +1,45 @@
+XFA file pdf : dibuat menggunakan adobe. Harus menggunakan adobe acrobat untuk merubah atau mengisi form xfa (berbayar).
+
+convert ke pdf :
+
+
+FILLPDF : 
+
+
+PDFTK : untuk mengekstrak field pdf menggunakan command prompt (kelemahan sudah di discontinued dari tahun 2020)
+pdftk 2018_1770S.pdf dump_data_fields > form_fields.txt
+
+pdftk 2018_1770S.pdf input_pw YOURPASSWORD dump_data_fields > form_fields.txt
+
+
+
+PDFRW : library python untuk memanipulasi pdf
+berhasil namun form tidak terisi.
+
+karena nama field seperti ini
+Field Name: þÿ f 1 _ 1 [ 0 ]
+Field Name: þÿ f 1 _ 2 [ 0 ]
+Field Name: þÿ f 1 _ 3 [ 0 ]
+
+tanda þÿ disebut sebagai byte order mark (BOM)
+apa penyebab bom? 
+proses pembuatan pdf yang tidak baik dalam adobe acrobat atau file pdf yang corrupt
+
+
+def clean_field_name(field_name):
+    try:
+        cleaned_name = field_name.encode('latin1').decode('utf-16')
+    except UnicodeDecodeError:
+        cleaned_name = field_name.encode('latin1').decode('utf-8', 'ignore')
+
+
+fix :
+BOM stripping as well as non-ASCII characters
+the 0xfe byte is part of a UTF-16 encoding, which is commonly used when there are BOM characters (like þÿ)
+
+
+Latin-1 (ISO-8859-1)	Western European languages
+UTF-8	1-4 bytes	Full Unicode character set	Widely used for web pages, emails, and modern systems. It’s efficient for texts primarily in ASCII.
+UTF-16	2-4 bytes	Full Unicode character set	Often used for languages with many non-ASCII characters. More efficient for languages like Chinese, Japanese, and Korean.
+
+
