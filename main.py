@@ -1,27 +1,15 @@
 import os
 import logging
 import argparse
+import re
 import pandas as pd
 from faker import Faker
-from fillpdf import fillpdfs
 from concurrent.futures import ThreadPoolExecutor
-
-# # check field
-# form_field = fillpdfs.get_form_fields("filled.pdf")
-
-# # for key, value in form_field.items():
-
-# #     form_field.update({key: random.randint(3, 9)})
-
-# for key, value in form_field.items():
-#     if value == "":
-#         pass
-#     else: 
-#         print(key + "->" + str(value))
+from pdfrw import PdfReader, PdfWriter, IndirectPdfDict
 
 # # cli
 # # python main.py f1040ez--2016.pdf output_forms filled_data.csv
-
+# # python main.py form.pdf output_forms filled_data.csv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -33,59 +21,95 @@ FORM = 1
 
 fake = Faker()
 
-def random_data_generator() :
+def clean_field_name(field_name):
+    try:
+        cleaned_name = field_name.encode('latin1').decode('utf-16')
+    except UnicodeDecodeError:
+        cleaned_name = field_name.encode('latin1').decode('utf-8', 'ignore')
+
+    cleaned_name = re.sub(r'[^\w\s]', '', cleaned_name)
+    
+    return cleaned_name.strip()
+
+def get_field(input_pdf_path):
+    template_pdf = PdfReader(input_pdf_path)
+    annotations = template_pdf.pages[0]['/Annots']
+    form_fields = []
+
+    for annotation in annotations:
+        if annotation['/Subtype'] == '/Widget' and annotation['/T']:
+            field_name = annotation['/T'][1:-1]
+            cleaned_field_name = clean_field_name(field_name)
+            form_fields.append(cleaned_field_name)
+    return form_fields
+
+def random_data_generator(form_fields) :
     # generated field
-    form_field = {
-        "þÿf1_1[0]": fake.first_name(),
-        "þÿf1_2[0]": fake.last_name(),
-        "þÿf1_3[0]": fake.ssn(),
-        "þÿf1_6[0]": fake.street_address(),
-        "þÿf1_7[0]": fake.building_number(),
-        "þÿf1_8[0]": fake.city() + " " + fake.state()  + " " + fake.zipcode(),
-        "þÿf1_12[0]": fake.random_int(min=1000, max=100000),
-        "þÿf1_14[0]": fake.random_int(min=0, max=1500),
-        "þÿf1_16[0]": fake.random_int(min=0, max=10000),
-        "þÿf1_20[0]": SINGLE_DEDUCTION,
-        "þÿf1_24[0]": fake.random_int(min=0, max=10000),
-        "þÿf1_26[0]": fake.random_int(min=0, max=2000),
-        "þÿf1_34[0]": fake.random_int(min=0, max=1000),
-        "þÿf1_40[0]": fake.random_number(digits=9),
-        "þÿf1_41[0]": fake.random_number(digits=12),
-        "þÿf1_47[0]": fake.job(),
-        "þÿf1_48[0]": fake.phone_number(),
+    rand_data = {
+        form_fields[0]: fake.first_name(),
+        form_fields[1]: fake.last_name(),
+        form_fields[2]: fake.ssn().replace('-', ''),
+        form_fields[6]: fake.street_address(),
+        form_fields[7]: fake.building_number(),
+        form_fields[8]: fake.city() + " " + fake.state()  + " " + fake.zipcode(),
+        form_fields[14]: fake.random_int(min=1000, max=100000),
+        form_fields[16]: fake.random_int(min=0, max=1500),
+        form_fields[18]: fake.random_int(min=0, max=10000),
+        form_fields[24]: SINGLE_DEDUCTION,
+        form_fields[28]: fake.random_int(min=0, max=10000),
+        form_fields[30]: fake.random_int(min=0, max=2000),
+        form_fields[39]: fake.random_int(min=0, max=1000),
+        form_fields[46]: fake.random_number(digits=9),
+        form_fields[49]: fake.random_number(digits=12),
+        form_fields[57]: fake.job(),
+        form_fields[58]: fake.phone_number(),
     }
 
     #calculation field
-    gross = form_field["þÿf1_12[0]"] + form_field["þÿf1_14[0]"] + form_field["þÿf1_16[0]"]
-    taxable_income = max(gross - form_field["þÿf1_20[0]"],0)
-    total_payment = form_field["þÿf1_24[0]"] + form_field["þÿf1_26[0]"]
+    gross = rand_data[form_fields[14]] + rand_data[form_fields[16]] + rand_data[form_fields[18]]
+    taxable_income = max(gross - rand_data[form_fields[24]],0)
+    total_payment = rand_data[form_fields[28]] + rand_data[form_fields[30]]
     tax = taxable_income * TAX_RATE
-    total_tax = tax + form_field["þÿf1_34[0]"]
+    total_tax = tax + rand_data[form_fields[39]]
     refund = max(total_payment - total_tax, 0)
     owed = max(total_tax - total_payment, 0)
 
     cal_field = {
-        "þÿf1_18[0]": gross,
-        "þÿf1_22[0]": taxable_income,
-        "þÿf1_30[0]": total_payment,
-        "þÿf1_32[0]": tax,
-        "þÿf1_36[0]": total_tax,
-        "þÿf1_38[0]": refund,
-        "þÿf1_42[0]": owed
+        form_fields[20]: gross,
+        form_fields[26]: taxable_income,
+        form_fields[34]: total_payment,
+        form_fields[36]: tax,
+        form_fields[41]: total_tax,
+        form_fields[44]: refund,
+        form_fields[50]: owed
     }
 
-    form_field |= cal_field #bind field
+    rand_data |= cal_field #bind field
 
-    return form_field
+    return rand_data
 
 def fill_data(template, output, data):
-    fields = fillpdfs.get_form_fields(template)
-    fillpdfs.write_fillable_pdf(template, output, fields)
+    template_pdf = PdfReader(template)
+    annotations = template_pdf.pages[0]['/Annots']
+
+    # Iterate semua field
+    for annotation in annotations:
+        if annotation['/Subtype'] == '/Widget' and annotation['/T']:
+            field_name = annotation['/T'][1:-1]  #ambil nama field (remove parentheses)
+            cleaned_field_name = clean_field_name(field_name)  # Clean the field name
+
+            # Check nama field ada di data fill/ data_dict
+            if cleaned_field_name in data:
+                annotation.update(
+                    IndirectPdfDict(V='{}'.format(data[cleaned_field_name]))  # isi field
+                )
+
+    # Save the filled PDF
+    PdfWriter(output, trailer=template_pdf).write()
 
 def process_record(template, output_dir, record_id):
     try:
-        record = random_data_generator()
-        print(record)
+        record = random_data_generator(get_field(template))
         pdf_name = os.path.join(output_dir, f"form_{record_id+1}.pdf")
         fill_data(template, pdf_name, record)
         logging.info(f"PDF generated: {pdf_name}")
@@ -93,7 +117,7 @@ def process_record(template, output_dir, record_id):
     except Exception as e:
         logging.error(f"Error processing record {record_id+1}: {e}")
         return None
-    
+
 def main(template, output_dir, csv_file, num_records):
     # Validate inputs
     if not os.path.isfile(template):
@@ -128,34 +152,34 @@ def main(template, output_dir, csv_file, num_records):
 
 def rename_csv():
     column_mapping = {
-        "þÿf1_1[0]": "firstname",
-        "þÿf1_2[0]": "lastname",
-        "þÿf1_3[0]": "ssn",
-        "þÿf1_6[0]": "adress",
-        "þÿf1_7[0]": "apt no",
-        "þÿf1_8[0]": "adress2",
-        "þÿf1_12[0]": "wages",
-        "þÿf1_14[0]": "interest",
-        "þÿf1_16[0]": "un-comp",
-        "þÿf1_18[0]": "gross",
-        "þÿc1_3[0]": "Off",
-        "þÿc1_4[0]": "Off",
-        "þÿf1_20[0]": "deduction",
-        "þÿf1_22[0]": "taxable-income",
-        "þÿf1_24[0]": "withheld",
-        "þÿf1_26[0]": "eic",
-        "þÿf1_30[0]": "total-payment",
-        "þÿf1_32[0]": "tax",
-        "þÿc1_05[0]": "Off",
-        "þÿf1_34[0]": "health-care",
-        "þÿf1_36[0]": "total-tax",
-        "þÿc1_6[0]": "Off",
-        "þÿf1_38[0]": "refund",
-        "þÿf1_40[0]": "routing",
-        "þÿf1_41[0]": "acc-num",
-        "þÿf1_42[0]": "owed",
-        "þÿf1_47[0]": "occupation",
-        "þÿf1_48[0]": "phone",
+        "f1_1[0]": "firstname",
+        "f1_2[0]": "lastname",
+        "f1_3[0]": "ssn",
+        "f1_6[0]": "adress",
+        "f1_7[0]": "apt no",
+        "f1_8[0]": "adress2",
+        "f1_12[0]": "wages",
+        "f1_14[0]": "interest",
+        "f1_16[0]": "un-comp",
+        "f1_18[0]": "gross",
+        "c1_3[0]": "Off",
+        "c1_4[0]": "Off",
+        "f1_20[0]": "deduction",
+        "f1_22[0]": "taxable-income",
+        "f1_24[0]": "withheld",
+        "f1_26[0]": "eic",
+        "f1_30[0]": "total-payment",
+        "f1_32[0]": "tax",
+        "c1_05[0]": "Off",
+        "f1_34[0]": "health-care",
+        "f1_36[0]": "total-tax",
+        "c1_6[0]": "Off",
+        "f1_38[0]": "refund",
+        "f1_40[0]": "routing",
+        "f1_41[0]": "acc-num",
+        "f1_42[0]": "owed",
+        "f1_47[0]": "occupation",
+        "f1_48[0]": "phone",
     }
 
     csv_file = "filled_data.csv"
@@ -169,6 +193,8 @@ def rename_csv():
 
     # Save the updated CSV
     df.to_csv(output_file, index=False)
+
+    os.remove(csv_file)
 
     print(f"CSV columns renamed and saved to {output_file}")
 
