@@ -1,7 +1,7 @@
 import os
 import logging
-import argparse
 import re
+from tkinter import font
 import pandas as pd
 from faker import Faker
 from concurrent.futures import ThreadPoolExecutor
@@ -11,14 +11,17 @@ from tkinter import filedialog, messagebox
 
 # logging 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-# ini untuk fine tune, FORM itu jumlah form yg akan dibuat
+
+# parameter static
 SINGLE_DEDUCTION = 10350
 DOUBLE_DEDUCTION = 20700
 TAX_RATE = 0.1
 FORM = 1
 
+# inisialisasi faker untuk generate data sintetis
 fake = Faker()
 
+# funtion untuk membersihkan field PDF dari BOM
 def clean_field_name(field_name):
     try:
         cleaned_name = field_name.encode('latin1').decode('utf-16')
@@ -29,6 +32,7 @@ def clean_field_name(field_name):
     
     return cleaned_name.strip()
 
+# funtion untuk mengambil field PDF
 def get_field(input_pdf_path):
     template_pdf = PdfReader(input_pdf_path)
     annotations = template_pdf.pages[0]['/Annots']
@@ -41,7 +45,9 @@ def get_field(input_pdf_path):
             form_fields.append(cleaned_field_name)
     return form_fields
 
+# function untuk mengenerate data sintetis
 def random_data_generator(form_fields):
+    # field yang dapat lansung di-generate
     rand_data = {
         form_fields[0]: fake.first_name(),
         form_fields[1]: fake.last_name(),
@@ -61,6 +67,9 @@ def random_data_generator(form_fields):
         form_fields[57]: fake.job(),
         form_fields[58]: fake.phone_number(),
     }
+
+    # Spesifikasi rentang nilai
+
     # Numerical values in the form should be random values within ranges below, 
     # but calculated numerical fields should still be populated based on instructions in the form 
     #  (straightforward calculations, add or deduct a couple of values). 
@@ -73,8 +82,7 @@ def random_data_generator(form_fields):
     #     Health care - [0-1.000]
     #     Calculate tax for line #10 as 10% of line 6
 
-
-    #calculation field
+    # perhitungan berdasarkan spesifikasi
     gross = rand_data[form_fields[14]] + rand_data[form_fields[16]] + rand_data[form_fields[18]]
     taxable_income = max(gross - rand_data[form_fields[24]], 0)
     total_payment = rand_data[form_fields[28]] + rand_data[form_fields[30]]
@@ -83,6 +91,7 @@ def random_data_generator(form_fields):
     refund = max(total_payment - total_tax, 0)
     owed = max(total_tax - total_payment, 0)
 
+    # field yang perlu dihitung terlebih dahulu
     cal_field = {
         form_fields[20]: gross,
         form_fields[26]: taxable_income,
@@ -93,9 +102,12 @@ def random_data_generator(form_fields):
         form_fields[50]: owed
     }
 
+    # bind kedua field
     rand_data |= cal_field
+    # keluaran berupa dict yang bersisi field-field yang perlu digenerate
     return rand_data
 
+# function untuk mengisi data ke PDF
 def fill_data(template, output, data):
     template_pdf = PdfReader(template)
     annotations = template_pdf.pages[0]['/Annots']
@@ -112,9 +124,10 @@ def fill_data(template, output, data):
                     IndirectPdfDict(V='{}'.format(data[cleaned_field_name]))
                 )
 
-    # Save the filled PDF
+    # Save PDF yang sudah terisi
     PdfWriter(output, trailer=template_pdf).write()
 
+# funtion untuk memproses PDF
 def process_record(template, output_dir, record_id):
     try:
         record = random_data_generator(get_field(template))
@@ -125,24 +138,27 @@ def process_record(template, output_dir, record_id):
     except Exception as e:
         logging.error(f"Error processing record {record_id+1}: {e}")
         return None
-
+    
+#function utama
 def main(template, output_dir, csv_file, num_records):
-    # Validate inputs
+    # validasi inputs
     if not os.path.isfile(template):
         raise FileNotFoundError(f"Template file not found: {template}")
     if not os.access(os.path.dirname(output_dir) or ".", os.W_OK):
         raise PermissionError(f"No write access to directory: {output_dir}")
     
-    # Create output directory if it doesn't exist
+    # membuat directory output baru jika belum ada
     os.makedirs(output_dir, exist_ok=True)
 
     logging.info("Starting record generation...")
+
     # ini eksekusi buat multithreading bikin pdfnya
     with ThreadPoolExecutor() as executor:
         results = list(executor.map(
             lambda i: process_record(template, output_dir, i),
             range(num_records)
         ))
+
     # filter data invalid
     csv_data = [record for record in results if record]
 
@@ -153,30 +169,30 @@ def main(template, output_dir, csv_file, num_records):
         df.insert(0, 'File_name', [f'form_{i}.pdf' for i in range(len(df))])
         # ini mapping kolom-kolom pertama dari exctracted pdf
         rename_mapping = {
-        "f1_10": "firstname",
-        "f1_20": "lastname",
-        "f1_30": "ssn",
-        "f1_60": "adress",
-        "f1_70": "apt no",
-        "f1_80": "adress2",
-        "f1_120": "wages",
-        "f1_140": "interest",
-        "f1_160": "un-comp",
-        "f1_180": "gross",
-        "f1_220": "deduction",
-        "f1_300": "taxable-income",
-        "f1_320": "withheld",
-        "f1_360": "total-tax",
-        "f1_380": "refund",
-        "f1_420": "owed",
-        "f1_470": "occupation",
-        "f1_480": "phone",
-        "f1_200": "adjusted_gross_income",
-        "f1_240": "tax",
-        "f1_260": "total_payments",
-        "f1_340": "total_income",
-        "f1_400": "refund",
-        "f1_410": "amount_owed"
+            "f1_10": "firstname",
+            "f1_20": "lastname",
+            "f1_30": "ssn",
+            "f1_60": "adress",
+            "f1_70": "apt no",
+            "f1_80": "adress2",
+            "f1_120": "wages",
+            "f1_140": "interest",
+            "f1_160": "un-comp",
+            "f1_180": "gross",
+            "f1_220": "deduction",
+            "f1_300": "taxable-income",
+            "f1_320": "withheld",
+            "f1_360": "total-tax",
+            "f1_380": "refund",
+            "f1_420": "owed",
+            "f1_470": "occupation",
+            "f1_480": "phone",
+            "f1_200": "adjusted_gross_income",
+            "f1_240": "tax",
+            "f1_260": "total_payments",
+            "f1_340": "total_income",
+            "f1_400": "refund",
+            "f1_410": "amount_owed"
         }
 
         # iterasi kolom dan mengganti nama sesuai mapping
@@ -191,7 +207,7 @@ def main(template, output_dir, csv_file, num_records):
     else:
         logging.warning("No records were successfully generated. CSV not saved.")
 
-# integrasi UI
+# Aspek UI
 def pilih_template():
     file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
     if file_path:
@@ -209,6 +225,7 @@ def pilih_output_dir():
         output_dir = directory
     else:
         output_label.config(text="No output directory selected")
+        
 def mulai_proses():
     if not template_path or not output_dir:
         messagebox.showerror("Error", "Template dan Output Directory harus dipilih!")
@@ -224,6 +241,9 @@ def mulai_proses():
 
 root = tk.Tk()
 root.title("PDF Form Filler")
+width = int(root.winfo_screenwidth() * 0.3)
+height = int(root.winfo_screenheight() * 0.35)
+root.geometry(f"{width}x{height}")
 
 template_label = tk.Label(root, text="No template selected", wraplength=400)
 template_label.pack(pady=5)
@@ -244,7 +264,10 @@ num_entry = tk.Entry(root, width=10)
 num_entry.insert(0, "1")
 num_entry.pack(pady=5)
 
-mulai_button = tk.Button(root, text="Mulai", command=mulai_proses)
+mulai_button = tk.Button(root, text="Generate", command=mulai_proses)
 mulai_button.pack(pady=10)
 
+global_font = font.nametofont("TkDefaultFont")
+global_font.config(family="lato", size=12)
+root.option_add("*Font", global_font)
 root.mainloop()
