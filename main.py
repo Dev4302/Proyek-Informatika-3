@@ -1,22 +1,21 @@
 import os
-import logging
 import re
-from tkinter import font
+import logging
 import pandas as pd
+import tkinter as tk
 from faker import Faker
+from tkinter import font
+from tkinter import filedialog, messagebox
 from concurrent.futures import ThreadPoolExecutor
 from pdfrw import PdfReader, PdfWriter, IndirectPdfDict
-import tkinter as tk
-from tkinter import filedialog, messagebox
 
 # logging 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# parameter static
+# parameter static - dapat diubah sesuai kebutuhan 
 SINGLE_DEDUCTION = 10350
 DOUBLE_DEDUCTION = 20700
 TAX_RATE = 0.1
-FORM = 1
 
 # inisialisasi faker untuk generate data sintetis
 fake = Faker()
@@ -225,7 +224,7 @@ def pilih_output_dir():
         output_dir = directory
     else:
         output_label.config(text="No output directory selected")
-        
+
 def mulai_proses():
     if not template_path or not output_dir:
         messagebox.showerror("Error", "Template dan Output Directory harus dipilih!")
