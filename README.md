@@ -10,7 +10,7 @@ Berdasarkan [Topcoder challenge :](https://www.topcoder.com/challenges/fae544aa-
  
 Sintaks :
  
-`python [main.py](http://main.py)  \[pdf-template-file\] \[nama folder output\] \[nama csv\] \[jumlah pdf\]`
+python [main.py](http://main.py)  \[pdf-template-file\] \[nama folder output\] \[nama csv\] \[jumlah pdf\]
  
 Contoh :
  
