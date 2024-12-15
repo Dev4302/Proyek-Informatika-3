@@ -22,7 +22,7 @@ python main.py  \[pdf-template-file\] \[nama folder output\] \[nama csv\] \[juml
  
 Contoh :
  
-`python main.py  f1040ez--2016.pdf output\_forms filled\_data.csv 30`
+`python main.py  f1040ez--2016.pdf output-forms filled-data.csv 30`
  
 
 ### GUI
