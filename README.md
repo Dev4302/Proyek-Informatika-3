@@ -1,7 +1,15 @@
 # Proyek Informatika - 3
  
 Berdasarkan [Topcoder challenge :](https://www.topcoder.com/challenges/fae544aa-1859-48de-b8a2-36a4e9b6b38e)  IntelliForm Data Generator 1 - 1040EZ
- 
+
+### Prequisite :
+Install modul pip berikut :
+- pandas 
+- faker
+- pdf
+
+dengan command :
+`pip install pandas faker pdfrw`
 
 ### Usage - Cara Pakai
  
