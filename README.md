@@ -6,7 +6,7 @@ Berdasarkan [Topcoder challenge :](https://www.topcoder.com/challenges/fae544aa-
 Install modul pip berikut :
 - pandas 
 - faker
-- pdf
+- pdfrw
 
 dengan command :
 `pip install pandas faker pdfrw`
