@@ -15,7 +15,7 @@ dengan command :
  
 
 ### Command Line
- 
+Untuk versi command line, gunakan branch `cmd-mode-only`
 Sintaks :
  
 python main.py  \[pdf-template-file\] \[nama folder output\] \[nama csv\] \[jumlah pdf\]
